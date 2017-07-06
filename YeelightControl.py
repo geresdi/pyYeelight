@@ -1,5 +1,6 @@
 import socket as s
 import json as j
+from time import sleep
 
 class YeelightControl:
     
@@ -103,12 +104,12 @@ class YeelightControl:
             m = "on"
         else: 
             m = "off"
-        message = {"id":1,"method":"set_power","params":[m,"smooth", 250]}
-        self._send(j.JSONEncoder().encode(message)+"\r\n")
+        message = {"id":1,"method":"set_power","params":[m,"sudden", 0]}
+        self._comm(j.JSONEncoder().encode(message)+"\r\n")
         
     def toggle(self):
         message = {"id":1,"method":"toggle","params":[]}
-        self._send(j.JSONEncoder().encode(message)+"\r\n")
+        self._comm(j.JSONEncoder().encode(message)+"\r\n")
         
     @property
     def name(self):
@@ -130,13 +131,61 @@ class YeelightControl:
         val = int(val)
         if val < 1 or val > 100:
             return False
-        message = {"id":1,"method":"set_bright","params":[val,"smooth",250]}
-        self._send(j.JSONEncoder().encode(message)+"\r\n")
-    
+        message = {"id":1,"method":"set_bright","params":[val,"sudden",0]}
+        self._comm(j.JSONEncoder().encode(message)+"\r\n")
         
+    @property
+    def temperature(self):
+        message = {"id":1,"method":"get_prop","params":["ct"]}
+        return int(j.JSONDecoder().decode(self._comm(j.JSONEncoder().encode(message)+"\r\n"))["result"][0])
+    
+    @temperature.setter
+    def temperature(self,val):
+        val = int(val)
+        if val < 1700 or val > 6500:
+            return False
+        message = {"id":1,"method":"set_ct_abx","params":[val,"sudden",0]}
+        self._comm(j.JSONEncoder().encode(message)+"\r\n")
+        
+    @property
+    def rgb(self):
+        message = {"id":1,"method":"get_prop","params":["rgb"]}
+        val=int(j.JSONDecoder().decode(self._comm(j.JSONEncoder().encode(message)+"\r\n"))["result"][0])
+        b = val % 256
+        g = (val % 65536) // 256
+        r = (val - b - g) // 65536
+        return {'raw': val, 'r':r, 'g':g, 'b':b}  
+    
+    @rgb.setter
+    def rgb(self,colors):
+        r = int(colors[0])
+        g = int(colors[1])
+        b = int(colors[2])
+        if r < 0 or r > 255 or b < 0 or b > 255 or g < 0 or g > 255:
+            return False
+        val = 65536 * r + 256 * g + b 
+        message = {"id":1,"method":"set_rgb","params":[val,"sudden",0]}
+        self._comm(j.JSONEncoder().encode(message)+"\r\n")
+
+    @property
+    def hue(self):
+        message = {"id":1,"method":"get_prop","params":["hue"]}
+        val=int(j.JSONDecoder().decode(self._comm(j.JSONEncoder().encode(message)+"\r\n"))["result"][0])
+        return val
+    
+    #TODO: set hue via set_hsv
+    
+    @property
+    def saturation(self):   
+        message = {"id":1,"method":"get_prop","params":["sat"]}
+        val=int(j.JSONDecoder().decode(self._comm(j.JSONEncoder().encode(message)+"\r\n"))["result"][0])
+        return val     
+    
+    #TODO: set saturation via set_hsv
     
     
-    
+    #low level communication
+        
     def _comm(self, message):
         if self._send(message) == True:
             return self._receive()
@@ -148,5 +197,10 @@ class YeelightControl:
         return False
     
     def _receive(self):
-        return self._com_sock.recv(1024).decode()
+        sleep(0.2)
+        #ret = self._com_sock.recv(4096).decode()
+        #print(ret)
+        #return ret.split('\r\n')[-2]
+        return self._com_sock.recv(1024).decode().split('\r\n')[-2]
+
     
