@@ -28,8 +28,14 @@ class YeelightControl:
         d_port = 1982
         d_sock = s.socket(s.AF_INET,s.SOCK_DGRAM)
         d_sock.settimeout(1.0)
-        d_sock.sendto(d_message.encode(),(d_IP,d_port))
-        d_result = d_sock.recv(1024).decode().split('\r\n')
+        try:
+            d_sock.sendto(d_message.encode(),(d_IP,d_port))
+        except s.error:
+            return False
+        try:
+            d_result = d_sock.recv(1024).decode().split('\r\n')
+        except s.error:
+            return False    
         if d_result[0].strip() ==  "HTTP/1.1 200 OK":
             self._refresh = int(d_result[1].split("=")[1])
             self._ip = d_result[4].split(":")[2][2:]
@@ -54,7 +60,11 @@ class YeelightControl:
     def connect(self):
         com_sock = s.socket(s.AF_INET,s.SOCK_STREAM)
         com_sock.settimeout(1.0)
-        if com_sock.connect_ex((self._ip,self._port)) == 0:
+        try:
+            result = com_sock.connect_ex((self._ip,self._port))
+        except s.error:
+            return False
+        if result == 0:
             self._com_sock = com_sock
             return True
         return False
@@ -183,16 +193,19 @@ class YeelightControl:
     
     #TODO: set saturation via set_hsv
     
-    
     #low level communication
         
     def _comm(self, message):
         if self._send(message) == True:
             return self._receive()
-        return False
+        return None
     
     def _send(self, message):
-        if self._com_sock.sendall(message.encode()) == None:
+        try:
+            result = self._com_sock.sendall(message.encode())
+        except s.error:
+            return False
+        if result == None:
             return True
         return False
     
@@ -201,6 +214,10 @@ class YeelightControl:
         #ret = self._com_sock.recv(4096).decode()
         #print(ret)
         #return ret.split('\r\n')[-2]
-        return self._com_sock.recv(1024).decode().split('\r\n')[-2]
+        try:
+            result = self._com_sock.recv(1024).decode()
+        except s.error:
+            return None
+        return result.split('\r\n')[-2]
 
     
